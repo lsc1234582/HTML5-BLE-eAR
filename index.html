@@ -151,6 +151,10 @@ Please enable Java script on your browser. </br>
   });
   
 }*/
+
+var tempData = [];
+var AccData = [];
+
 function padHex(value) {
   return ('00' + value.toString(16).toUpperCase()).slice(-2);
 }
@@ -187,7 +191,10 @@ function handleIMUNotifications(event) {
   LineGraph_Plot(0); 
   LineGraph_Plot(1);  
   LineGraph_Plot(2);  
+  acc = {acc1: ax, acc2: ay, acc3: az};
+  AccData.push(acc);
 }
+
 function handleTemperatureNotifications(event)
 {//read the temperature values and plot those out
  let value = event.target.value;
@@ -196,7 +203,89 @@ function handleTemperatureNotifications(event)
   LineGraph_AddData(3,0,temp1/10.0);
   LineGraph_AddData(3,1,temp2/10.0);  
   LineGraph_Plot(3); 
+  temp = {temperature1: temp1, temperature2: temp2};
+  tempData.push(temp);
 }
+
+
+function convertArrayOfObjectsToCSV(args) {  
+    var result, ctr, keys, columnDelimiter, lineDelimiter, data;
+
+    data = args.data || null;
+    if (data == null || !data.length) {
+        return null;
+    }
+
+    columnDelimiter = args.columnDelimiter || ',';
+    lineDelimiter = args.lineDelimiter || '\n';
+
+    keys = Object.keys(data[0]);
+
+    result = '';
+    result += keys.join(columnDelimiter);
+    result += lineDelimiter;
+
+    data.forEach(function(item) {
+        ctr = 0;
+        keys.forEach(function(key) {
+            if (ctr > 0) result += columnDelimiter;
+
+            result += item[key];
+            ctr++;
+        });
+        result += lineDelimiter;
+    });
+
+    return result;
+}
+
+function downloadCSV_Temp(args) {  
+    var data, filename, link;
+    var csv = convertArrayOfObjectsToCSV({
+        data: tempData
+    });
+    console.log(csv);
+    if (csv == null) return;
+
+    filename = args.filename || 'export.csv';
+
+    if (!csv.match(/^data:text\/csv/i)) {
+        csv = 'data:text/csv;charset=utf-8,' + csv;
+    }
+    data = encodeURI(csv);
+
+    link = document.createElement('a');
+    link.setAttribute('href', data);
+    link.setAttribute('download', filename);
+    link.click();
+    tempData = [];
+}
+
+
+function downloadCSV_Acc(args) {  
+    var data, filename, link;
+    var csv = convertArrayOfObjectsToCSV({
+        data: AccData
+    });
+    console.log(csv);
+    if (csv == null) return;
+
+    filename = args.filename || 'export.csv';
+
+    if (!csv.match(/^data:text\/csv/i)) {
+        csv = 'data:text/csv;charset=utf-8,' + csv;
+    }
+    data = encodeURI(csv);
+
+    link = document.createElement('a');
+    link.setAttribute('href', data);
+    link.setAttribute('download', filename);
+    link.click();
+    tempData = [];
+}
+
+
+
 function handleAccelNotifications(event) {
   let value = event.target.value;
   let a = [];
@@ -378,9 +467,17 @@ function getSupportedProperties(characteristic) {//find the details of a charact
   <li>Should you have issue connecting, please first check the Google Chrome console for error messages (More Tools->Deverloper Tools->Console)</li>
 </ul>
   Source code can be found via: <a href="https://github.com/bennyplo/HTML5-BLE-eAR">https://github.com/bennyplo/HTML5-BLE-eAR</a><br/><hr/>
+  
 </div>
 <!--<input type="button" id="deviceinfo" value="Get Device Information" onclick="onButtonClick();"/>-->
 <input type="button" id="discover" value="Discover BLE devices" onclick="onDiscoverService();"/><br/>
+<a href='#' 
+        onclick='downloadCSV_Acc({ filename: "Acc-data.csv" });'
+    >Download CSV</a>
+
+<a href='#' 
+        onclick='downloadCSV_Temp({ filename: "temperature-data.csv" });'
+    >Download CSV</a>
 <table id="canvastable" hidden="1">
  <tr><td>Accelerometer</td><td>Gyroscope</td></tr> <tr><td>
 <canvas id="left_accelerometer" width="512" height="240"></canvas></td><td><canvas id="right_accelerometer" width="512" height="240"></canvas></td></tr>
