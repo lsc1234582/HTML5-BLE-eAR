@@ -298,7 +298,7 @@ function startGame() {
     //background = new Background("images/mountains2.png", 50, myGameArea);
     obstacleSpawn = new ObstacleSpawn(obstacles, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
     gameState = "ParkourMode";
-    setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
+    //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
 }
 
 function updateGame() {
@@ -374,11 +374,37 @@ socket.on("ACC_DATA_SERVER", function(data) {
     socket.emit("ACC_DATA_CLIENT", data);
 });
 
-var label_to_class_names = ["Jump", "Run", "LeanLeft", "LeanRight", "TurnAround"]
+var label_to_class_names = {0:"Jump", 1:"Run", 2:"LeanLeft", 3:"LeanRight", 4:"TurnAround", 5:"Idle"}
 socket.on("classification_server", function(data) {
     var label = data["label"];
-    console.log("LABEL!! " + label)
-    $("#class1").text(label_to_class_names[label])
+    var label_text = "";
+    if(label == 0)
+    {
+    	label_text = "Jump";
+    }
+    else if(label == 1)
+    {
+    	label_text = "Run";
+    } 
+    else if(label == 2)
+    {
+    	label_text = "LeanLeft";
+    } 
+    else if(label == 3)
+    {
+    	label_text = "LeanRight";
+    } 
+    else if(label == 4)
+    {
+    	label_text = "TurnAround";
+    } 
+    else if(label == 5)
+    {
+    	label_text = "Idle";
+    } 
+    console.log("LABEL!! " + label_text);
+
+    $("#class1").text(label_text);
 });
 
 function json_button() {

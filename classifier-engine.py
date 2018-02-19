@@ -17,8 +17,7 @@ NB_DATA_POINTS_PER_SIG = 104
 # Number of components
 NB_COMP = 60
 
-CSV_DATA_FOLDER_ROOT = "/home/sicong/Projects/FourthYearProjects/BodySensorNetworks/zbgame/python/BSN/"
-
+CSV_DATA_FOLDER_ROOT = "/Users/marieberard/Desktop/BSN"
 
 def getCSVData(file_name, nb_data_points):
     """
@@ -26,7 +25,7 @@ def getCSVData(file_name, nb_data_points):
     vector of shape (nb_data_points * number of columns, )
     """
     acc_data_arr = []
-    with open(CSV_DATA_FOLDER_ROOT + file_name, 'r') as f:
+    with open(os.path.join(CSV_DATA_FOLDER_ROOT, file_name), 'r') as f:
         reader = csv.reader(f, delimiter=',')
         for row_idx, row in enumerate(reader):
             if row_idx != 0:
@@ -47,7 +46,7 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
     """
     Xs = []
     Ys = []
-    label_to_cls_name = ["Jump", "Run", "LeanLeft", "LeanRight", "TurnAround"]
+    label_to_cls_name = ["Jump", "Run", "LeanLeft", "LeanRight", "TurnAround", "Idle"]
     # Add data for class Jump
     for i in range(1, nb_train_per_cls):
         feature = []
@@ -55,8 +54,8 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         feature.append(getCSVData(file_acc, nb_data_points_per_sig))
         file_gyr = "JGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        file_mag = "JMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        #file_mag = "JMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(0)
 
@@ -67,8 +66,8 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         feature.append(getCSVData(file_acc, nb_data_points_per_sig))
         file_gyr = "UGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        file_mag = "UMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        #file_mag = "UMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(1)
 
@@ -79,8 +78,8 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         feature.append(getCSVData(file_acc, nb_data_points_per_sig))
         file_gyr = "LGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        file_mag = "LMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        #file_mag = "LMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(2)
 
@@ -91,8 +90,8 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         feature.append(getCSVData(file_acc, nb_data_points_per_sig))
         file_gyr = "RGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        file_mag = "RMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        #file_mag = "RMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(3)
 
@@ -103,10 +102,22 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         feature.append(getCSVData(file_acc, nb_data_points_per_sig))
         file_gyr = "TGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        file_mag = "TMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        #file_mag = "TMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(4)
+
+    # Add data for class Idle
+    for i in range(1, nb_train_per_cls):
+        feature = []
+        file_acc ="IAcc-data ({}).csv".format(i)
+        feature.append(getCSVData(file_acc, nb_data_points_per_sig))
+        file_gyr = "IGyroscope-data ({}).csv".format(i)
+        feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
+        #file_mag = "IMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+        Xs.append(np.concatenate(feature).reshape(1, -1))
+        Ys.append(5)
 
     Xs = np.concatenate(Xs, axis=0)
     Ys = np.array(Ys).reshape(-1, 1)
@@ -156,8 +167,8 @@ if __name__ == "__main__":
         feature.append(getCSVData(file_acc, NB_DATA_POINTS_PER_SIG))
         file_gyr = "TestGyroscope-data ({}).csv".format(i)
         feature.append(getCSVData(file_gyr, NB_DATA_POINTS_PER_SIG))
-        file_mag = "TestMagnetometer-data ({}).csv".format(i)
-        feature.append(getCSVData(file_mag, NB_DATA_POINTS_PER_SIG))
+        #file_mag = "TestMagnetometer-data ({}).csv".format(i)
+        #feature.append(getCSVData(file_mag, NB_DATA_POINTS_PER_SIG))
         feature = np.concatenate(feature).reshape(1, -1)
 
         projected_X = pca.transform(feature)
