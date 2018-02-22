@@ -8,18 +8,17 @@ from sklearn.externals import joblib
 
 # Number of training samples for each class
 # NB: Number of training samples = NB_TRAIN_PER_CLS * number of classes
-NB_TRAIN_PER_CLS = 5
+NB_TRAIN_PER_CLS = 11
 
 # Number of data points for each signal
 # NB: Feature size = NB_DATA_POINTS_PER_SIG * number of components for each signal * number of signals
-NB_DATA_POINTS_PER_SIG = 104
+NB_DATA_POINTS_PER_SIG = 40
 
 # Number of components
-NB_COMP = 60
+NB_COMP = 60 
+CSV_DATA_FOLDER_ROOT = "/Users/marieberard/Desktop/BSN/CleanData/"
 
-CSV_DATA_FOLDER_ROOT = "/Users/marieberard/Desktop/BSN"
-
-def getCSVData(file_name, nb_data_points):
+def getCSVData(file_name, nb_data_points, start_row=0):
     """
     Read nb_data_points number of rows of a csv file and concatenate all entries into a single
     vector of shape (nb_data_points * number of columns, )
@@ -28,10 +27,14 @@ def getCSVData(file_name, nb_data_points):
     with open(os.path.join(CSV_DATA_FOLDER_ROOT, file_name), 'r') as f:
         reader = csv.reader(f, delimiter=',')
         for row_idx, row in enumerate(reader):
-            if row_idx != 0:
+            if row_idx < start_row:
+                continue
+            if row_idx != start_row:
+                print(file_name)
+                print(row)
                 acc_data = list(map(float, row))
                 acc_data_arr.append(acc_data)
-            if row_idx >= nb_data_points:
+            if row_idx >= start_row + nb_data_points:
                 break
     return np.concatenate(acc_data_arr)
 
@@ -46,7 +49,8 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
     """
     Xs = []
     Ys = []
-    label_to_cls_name = ["Jump", "Run", "LeanLeft", "LeanRight", "TurnAround", "Idle"]
+    #label_to_cls_name = ["Jump", "Run", "LeanLeft", "LeanRight", "TurnAround", "Idle"]
+    label_to_cls_name = ["Jump", "Run", "TurnAround", "Idle"]
     # Add data for class Jump
     for i in range(1, nb_train_per_cls):
         feature = []
@@ -71,29 +75,29 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         Xs.append(np.concatenate(feature).reshape(1, -1))
         Ys.append(1)
 
-    # Add data for class LearnLeft
-    for i in range(1, nb_train_per_cls):
-        feature = []
-        file_acc ="LAcc-data ({}).csv".format(i)
-        feature.append(getCSVData(file_acc, nb_data_points_per_sig))
-        file_gyr = "LGyroscope-data ({}).csv".format(i)
-        feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        #file_mag = "LMagnetometer-data ({}).csv".format(i)
-        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
-        Xs.append(np.concatenate(feature).reshape(1, -1))
-        Ys.append(2)
+    ## Add data for class LearnLeft
+    #for i in range(1, nb_train_per_cls):
+    #    feature = []
+    #    file_acc ="LAcc-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_acc, nb_data_points_per_sig))
+    #    file_gyr = "LGyroscope-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
+    #    #file_mag = "LMagnetometer-data ({}).csv".format(i)
+    #    #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+    #    Xs.append(np.concatenate(feature).reshape(1, -1))
+    #    Ys.append(2)
 
-    # Add data for class LearnRight
-    for i in range(1, nb_train_per_cls):
-        feature = []
-        file_acc ="RAcc-data ({}).csv".format(i)
-        feature.append(getCSVData(file_acc, nb_data_points_per_sig))
-        file_gyr = "RGyroscope-data ({}).csv".format(i)
-        feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
-        #file_mag = "RMagnetometer-data ({}).csv".format(i)
-        #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
-        Xs.append(np.concatenate(feature).reshape(1, -1))
-        Ys.append(3)
+    ## Add data for class LearnRight
+    #for i in range(1, nb_train_per_cls):
+    #    feature = []
+    #    file_acc ="RAcc-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_acc, nb_data_points_per_sig))
+    #    file_gyr = "RGyroscope-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_gyr, nb_data_points_per_sig))
+    #    #file_mag = "RMagnetometer-data ({}).csv".format(i)
+    #    #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
+    #    Xs.append(np.concatenate(feature).reshape(1, -1))
+    #    Ys.append(3)
 
     # Add data for class TurnAround
     for i in range(1, nb_train_per_cls):
@@ -105,7 +109,7 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         #file_mag = "TMagnetometer-data ({}).csv".format(i)
         #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
-        Ys.append(4)
+        Ys.append(2)
 
     # Add data for class Idle
     for i in range(1, nb_train_per_cls):
@@ -117,7 +121,7 @@ def createTrainingData(nb_train_per_cls, nb_data_points_per_sig):
         #file_mag = "IMagnetometer-data ({}).csv".format(i)
         #feature.append(getCSVData(file_mag, nb_data_points_per_sig))
         Xs.append(np.concatenate(feature).reshape(1, -1))
-        Ys.append(5)
+        Ys.append(3)
 
     Xs = np.concatenate(Xs, axis=0)
     Ys = np.array(Ys).reshape(-1, 1)
@@ -153,26 +157,27 @@ if __name__ == "__main__":
         label_to_cls_name = training_data["label_to_cls_name"]
 
     # Train and persist pca and svm
-    pca, projected_Xs = trainPCA(Xs, NB_COMP)
-    clf = trainSVM(projected_Xs, Ys)
-    joblib.dump(pca, "PCA.pkl")
+    #pca, projected_Xs = trainPCA(Xs, NB_COMP)
+    clf = trainSVM(Xs, Ys)
+    print("Trained on {} number of training samples".format(NB_TRAIN_PER_CLS))
+    #joblib.dump(pca, "PCA.pkl")
     joblib.dump(clf, "SVM.pkl")
 
     # Test pca and svm
-    nb_test = 7
-    pred_Ys = []
-    for i in range(1, nb_test):
-        feature = []
-        file_acc ="TestAcc-data ({}).csv".format(i)
-        feature.append(getCSVData(file_acc, NB_DATA_POINTS_PER_SIG))
-        file_gyr = "TestGyroscope-data ({}).csv".format(i)
-        feature.append(getCSVData(file_gyr, NB_DATA_POINTS_PER_SIG))
-        #file_mag = "TestMagnetometer-data ({}).csv".format(i)
-        #feature.append(getCSVData(file_mag, NB_DATA_POINTS_PER_SIG))
-        feature = np.concatenate(feature).reshape(1, -1)
+    #nb_test = 7
+    #pred_Ys = []
+    #for i in range(1, nb_test):
+    #    feature = []
+    #    file_acc ="TestAcc-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_acc, NB_DATA_POINTS_PER_SIG))
+    #    file_gyr = "TestGyroscope-data ({}).csv".format(i)
+    #    feature.append(getCSVData(file_gyr, NB_DATA_POINTS_PER_SIG))
+    #    #file_mag = "TestMagnetometer-data ({}).csv".format(i)
+    #    #feature.append(getCSVData(file_mag, NB_DATA_POINTS_PER_SIG))
+    #    feature = np.concatenate(feature).reshape(1, -1)
 
-        projected_X = pca.transform(feature)
-        dec = clf.decision_function(projected_X)
-        pred_Ys.append(np.argmax(dec[0]))
+    #    projected_X = pca.transform(feature)
+    #    dec = clf.decision_function(projected_X)
+    #    pred_Ys.append(np.argmax(dec[0]))
 
-    print(pred_Ys)
+    #print(pred_Ys)

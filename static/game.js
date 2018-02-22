@@ -381,6 +381,7 @@ socket.on("classification_server", function(data) {
     if(label == 0)
     {
     	label_text = "Jump";
+      hero.jump();
     }
     else if(label == 1)
     {
@@ -388,11 +389,11 @@ socket.on("classification_server", function(data) {
     } 
     else if(label == 2)
     {
-    	label_text = "LeanLeft";
+    	label_text = "TurnAround";
     } 
     else if(label == 3)
     {
-    	label_text = "LeanRight";
+    	label_text = "Idle";
     } 
     else if(label == 4)
     {

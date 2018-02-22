@@ -17,14 +17,15 @@ socketio = SocketIO(app)
 thread = None
 thread_lock = Lock()
 
+#Number of fake data generated from the server side
 SAMPLE_SIZE = 50
-NB_DATA_POINTS_PER_SIG = 104
+NB_DATA_POINTS_PER_SIG = 40
 acc_buff = []
 gyr_buff = []
 #mag_buff = []
 
 
-ROOT = "/Users/marieberard/Desktop/BSN"
+ROOT = "/Users/marieberard/Desktop/BSN/CleanData"
 NB_TESTS = 7
 
 def createTestData():
@@ -97,7 +98,7 @@ def delay(delay=0.):
         return delayed
     return wrap
 
-@delay(1.0)
+@delay(1.5)
 def setReadyJump():
     global READY
     READY = True
@@ -147,6 +148,29 @@ def handle_data_event(json):
         label = classify(feature.reshape(1, -1))
         global READY
         if READY:
+            #if label == 0:
+            #    #jump
+            #    READY = False
+            #    setReadyJump()  
+            #elif label == 1:
+            #    #run
+            #    READY = False
+            #    setReadyRun()   
+            #elif label == 2:
+            #    #lean left
+            #    READY = False
+            #    setReadyLeanLeft()  
+            #elif label == 3:
+            #    #lean right
+            #    READY = False
+            #    setReadyLeanRight() 
+            #elif label == 4:
+            #    #turn around
+            #    READY = False
+            #    setReadyTurnAround()    
+            #else:
+            #    #idle
+            #    pass
             if label == 0:
                 #jump
                 READY = False
@@ -156,14 +180,6 @@ def handle_data_event(json):
                 READY = False
                 setReadyRun()   
             elif label == 2:
-                #lean left
-                READY = False
-                setReadyLeanLeft()  
-            elif label == 3:
-                #lean right
-                READY = False
-                setReadyLeanRight() 
-            elif label == 4:
                 #turn around
                 READY = False
                 setReadyTurnAround()    
@@ -180,14 +196,14 @@ def index():
 
 
 def classify(feature):
-    projected_X = pca.transform(feature)
-    dec = clf.decision_function(projected_X)
+    #projected_X = pca.transform(feature)
+    dec = clf.decision_function(feature)
     return np.argmax(dec[0])
 
 if __name__ == '__main__':
     global READY
     READY = True
-    test_data_df = createTestData()
-    pca = joblib.load("PCA.pkl")
+    #test_data_df = createTestData()
+    #pca = joblib.load("PCA.pkl")
     clf = joblib.load("SVM.pkl")
     socketio.run(app, debug=True)
