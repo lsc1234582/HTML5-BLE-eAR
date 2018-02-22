@@ -13,13 +13,16 @@ var myGameArea = {
             // the area that the hero is allowed to be in
             heroFocusLeft: 300,
             heroFocusRight: 700,
+            // the area that zombies are allowed to be in
+            zombieRangeLeft: -100,
+            zombieRangeRight: 1100,
             airDragAcc : 80
         };
         this.context = this.canvas.getContext("2d");
         this.deltaTime = 20;
         this.frames = 1000 / this.deltaTime;
         // frame number counter, could overflow but not a problem when only
-        // used to spawn obstacles and zombines
+        // used to spawn obstacles and zombies
         this.frameNo = 0;
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         this.interval = setInterval(updateGame, this.deltaTime);
@@ -86,7 +89,7 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
     this.rightLimit = gameArea.canvas.width;
     this.speedX = - gameArea.gameLogic.heroSpeedX;
     this.render = function() {
-        ctx = this.gameArea.context;
+        var ctx = this.gameArea.context;
         ctx.fillStyle = color;
         ctx.fillRect(this.x, this.y, this.width, this.height);
     }
@@ -101,6 +104,39 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
             obstacles.splice(obstacles.indexOf(this), 1);
         }
     }
+}
+
+function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
+    this.width = width;
+    this.height = height;
+    this.x = x;
+    this.y = y;
+    this.speedX = speedX;
+    this.speedY = 0;
+    this.gameArea = gameArea;
+
+    this.render = function() {
+        var ctx = gameArea.context;
+        ctx.fillStyle = color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+    this.updatePos = function() {
+        // Simple Zombie AI
+        // Positive velocity if Hero is ahead, negative velocity otherwise
+        var velocity = this.speedX;
+        if (hero.x < this.x) {
+            velocity = -this.speedX;
+        }
+        // Speed of zombie relative to player
+        var screenVelocity = velocity - this.gameArea.gameLogic.heroSpeedX;
+        this.x = this.x + screenVelocity / this.gameArea.frames;
+        // Remove itself from the zombies array when going out of limits
+        if (this.x <= this.gameArea.gameLogic.zombieRangeLeft ||
+                this.x >= this.gameArea.gameLogic.zombieRangeRight) {
+            zombies.splice(obstacles.indexOf(this), 1);
+        }
+    }
+
 }
 
 function Hero(width, height, color, x, y, gameArea) {
@@ -126,7 +162,7 @@ function Hero(width, height, color, x, y, gameArea) {
     this.accelerateX = 0;
     this.accelerateY = this.gravityAccelerate;
     this.render = function() {
-        ctx = this.gameArea.context;
+        var ctx = gameArea.context;
         ctx.fillStyle = color;
         ctx.fillRect(this.x, this.y, this.width, this.height);
     }
@@ -206,15 +242,18 @@ function Hero(width, height, color, x, y, gameArea) {
 var hero;
 var background;
 var obstacles = [];
-var zombines = [];
+var zombies = [];
 // Game states = ["ParkourMode", "ZombieMode", "ShiftAnimation"]
 var gameState;
-var obstacleSpawn;
+var ObstacleSpawn;
+var ZombieSpawn;
 // In miliseconds
 var shiftAnimationDuration = 500;
 var shiftAnimationAmount;
 var obstacleIntervalMin = 1200;
 var obstacleIntervalMax = 6000;
+var zombieIntervalMin = 300;
+var zombieIntervalMax = 1000;
 var heroSpeedUpAmount = 50;
 var heroSpeedUpInterval = 10000;
 
@@ -269,7 +308,7 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
     this.spawn = function() {
         if (this.nextReady) {
             this.nextReady = false;
-            var interval = obstacleIntervalMin + Math.floor(Math.random() * (obstacleIntervalMax - obstacleIntervalMin));
+            var interval = this.intervalMin + Math.floor(Math.random() * (this.intervalMax - this.intervalMin));
             setTimeout(this.spawnObstacleCallback(this), interval);
         }
     };
@@ -285,6 +324,30 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
     };
 }
 
+// Spawns a horde of zombies
+function ZombieSpawn(zombies, gameArea, hero, intervalMin, intervalMax) {
+    this.numZombieToSpawn = 0;
+    this.spawn = function(number) {
+        this.numZombieToSpawn = number;
+        this.spawnZombieCallback(this)();
+    }
+    this.spawnZombieCallback = function(zombieSpawn) {
+        return function() {
+            if (zombieSpawn.numZombieToSpawn > 0) {
+                var width = 50;
+                var height = 90;
+                var x = -width;
+                var y = gameArea.gameLogic.groundY - height;
+                var speedX = gameArea.gameLogic.heroSpeedX + 60;
+                zombies.unshift(new Zombie(width, height, "green", x, y, speedX, gameArea, zombies, hero));
+                zombieSpawn.numZombieToSpawn -= 1;
+                var interval = intervalMin + Math.floor(Math.random() * (intervalMax - intervalMin));
+                setTimeout(zombieSpawn.spawnZombieCallback(zombieSpawn), interval);
+            }
+        }
+    }
+}
+
 function heroSpeedUpCallback(gameArea, speedUpAmount) {
     return function() {
         gameArea.gameLogic.heroSpeedX += speedUpAmount;
@@ -292,12 +355,14 @@ function heroSpeedUpCallback(gameArea, speedUpAmount) {
 }
 
 
+
 function startGame() {
     myGameArea.start();
     hero = new Hero(35, 90, "red", myGameArea.canvas.width / 2, 20, myGameArea);
     //background = new Background("images/mountains2.png", 50, myGameArea);
-    obstacleSpawn = new ObstacleSpawn(obstacles, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
-    gameState = "ParkourMode";
+    ObstacleSpawn = new ObstacleSpawn(obstacles, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
+    ZombieSpawn = new ZombieSpawn(zombies, myGameArea, hero, zombieIntervalMin, zombieIntervalMax, 10)
+    gameState = "ZombieSpawn";
     //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
 }
 
@@ -312,6 +377,10 @@ function updateGame() {
         obstacles[i].render();
     }
     hero.render();
+    for (i = 0; i < zombies.length; i += 1) {
+        zombies[i].render();
+    }
+
     // Detect collision
     for (i = 0; i < obstacles.length; i += 1) {
         if (hero.crashWith(obstacles[i])) {
@@ -321,7 +390,7 @@ function updateGame() {
     }
     if (gameState == "ParkourMode") {
         // Spawn obstacles
-        obstacleSpawn.spawn();
+        ObstacleSpawn.spawn();
         //if (myGameArea.keyUp && myGameArea.keyUp == 37) {hero.backward(); }
         //if (myGameArea.keyUp && myGameArea.keyUp == 39) {hero.forward(); }
         if (myGameArea.key && myGameArea.key == 38) {
@@ -341,21 +410,44 @@ function updateGame() {
             setTimeout(function() { gameState = "ParkourMode"; }, shiftAnimationDuration);
         }
     } else if (gameState == "ShiftAnimation") {
-        // Spawn obstacles
-        //if (myGameArea.key && myGameArea.key == 38) {
-        //    heroController.invoke(myGameArea.deltaTime, "Down", hero);
-        //} else {
-        //    heroController.invoke(myGameArea.deltaTime, "Up", hero);
-        //}
-        //background.updatePos();
-        //for (i = obstacles.length - 1; i >= 0; i -= 1) {
-        //    obstacles[i].updatePos();
-        //}
         hero.updatePos();
         shiftAnimationAmountPerFrame = shiftAnimationAmount / (shiftAnimationDuration / myGameArea.deltaTime);
         hero.x += shiftAnimationAmountPerFrame;
         for (i = obstacles.length - 1; i >= 0; i -= 1) {
             obstacles[i].x += shiftAnimationAmountPerFrame;
+        }
+    } else if (gameState == "ZombieSpawn") {
+        ZombieSpawn.spawn(10);
+        if (myGameArea.key && myGameArea.key == 38) {
+            heroController.invoke(myGameArea.deltaTime, "Down", hero);
+        } else {
+            heroController.invoke(myGameArea.deltaTime, "Up", hero);
+        }
+        // update game state
+        hero.updatePos();
+
+        if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
+            shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
+            gameState = "ShiftAnimation";
+            setTimeout(function() { gameState = "ZombieMode"; }, shiftAnimationDuration);
+        }
+
+        gameState = "ZombieMode";
+    } else if (gameState == "ZombieMode") {
+        if (myGameArea.key && myGameArea.key == 38) {
+            heroController.invoke(myGameArea.deltaTime, "Down", hero);
+        } else {
+            heroController.invoke(myGameArea.deltaTime, "Up", hero);
+        }
+        // update game state
+        hero.updatePos();
+        for (i = zombies.length - 1; i >= 0; i -= 1) {
+            zombies[i].updatePos();
+        }
+        if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
+            shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
+            gameState = "ShiftAnimation";
+            setTimeout(function() { gameState = "ZombieMode"; }, shiftAnimationDuration);
         }
     }
 }
@@ -380,29 +472,29 @@ socket.on("classification_server", function(data) {
     var label_text = "";
     if(label == 0)
     {
-    	label_text = "Jump";
-      hero.jump();
+        label_text = "Jump";
+        hero.jump();
     }
     else if(label == 1)
     {
-    	label_text = "Run";
-    } 
+        label_text = "Run";
+    }
     else if(label == 2)
     {
-    	label_text = "TurnAround";
-    } 
+        label_text = "TurnAround";
+    }
     else if(label == 3)
     {
-    	label_text = "Idle";
-    } 
+        label_text = "Idle";
+    }
     else if(label == 4)
     {
-    	label_text = "TurnAround";
-    } 
+        label_text = "TurnAround";
+    }
     else if(label == 5)
     {
-    	label_text = "Idle";
-    } 
+        label_text = "Idle";
+    }
     console.log("LABEL!! " + label_text);
 
     $("#class1").text(label_text);
