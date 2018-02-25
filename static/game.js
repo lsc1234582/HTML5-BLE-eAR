@@ -82,6 +82,7 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
     this.width = width;
     this.height = height;
     this.gameArea = gameArea;
+    this.collided = false;
 
     this.x = x;
     this.y = y;
@@ -119,7 +120,7 @@ function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
         var ctx = gameArea.context;
         ctx.beginPath();
         ctx.rect(this.x, this.y, this.width, this.height)
-        ctx.fillStyle = color;
+            ctx.fillStyle = color;
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = "black";
@@ -142,6 +143,24 @@ function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
         }
     }
 
+    this.crashWith = function(otherObj) {
+        var myleft = this.x;
+        var myright = this.x + (this.width);
+        var mytop = this.y;
+        var mybottom = this.y + (this.height);
+        var otherleft = otherObj.x;
+        var otherright = otherObj.x + (otherObj.width);
+        var othertop = otherObj.y;
+        var otherbottom = otherObj.y + (otherObj.height);
+        var crash = true;
+        if ((mybottom < othertop) ||
+                (mytop > otherbottom) ||
+                (myright < otherleft) ||
+                (myleft > otherright)) {
+            crash = false;
+        }
+        return crash;
+    }
 }
 
 function Hero(width, height, color, x, y, gameArea) {
@@ -278,7 +297,7 @@ function Hero(width, height, color, x, y, gameArea) {
         var otherright = otherObj.x + (otherObj.width);
         var othertop = otherObj.y;
         var otherbottom = otherObj.y + (otherObj.height);
-        var crash = false;
+        var crash = true;
         if ((mybottom < othertop) ||
                 (mytop > otherbottom) ||
                 (myright < otherleft) ||
@@ -292,8 +311,9 @@ function Hero(width, height, color, x, y, gameArea) {
 var hero;
 var background;
 var obstacles = [];
+var obstaclesToJump = [];
 var zombies = [];
-// Game states = ["ParkourMode", "ZombieMode", "ShiftAnimation"]
+// Game states = ["ParkourMode", "ZombieWait", "ZombieSpawn", "ZombieMode", "ShiftAnimation"]
 var gameState;
 var ObstacleSpawn;
 var ZombieSpawn;
@@ -307,6 +327,10 @@ var obstacleSpawnAmountPerLevel = 15;
 var level = 1;
 var maxLevel = 10;
 var zombieModeDuration = 20000;
+// avoid 3 obstacles = ammo + 1
+var obstacleAvidScore = 0;
+
+var score = 0;
 
 var heroBaseSpeed = 150;
 var heroSpeedUpAmount = 50;
@@ -363,10 +387,9 @@ function zombieSpeed(level) {
     return zombieBaseSpeed + Math.min(level - 1, 9) * zombieSpeedUpAmount;
 }
 
-function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
+function ObstacleSpawn(obstacles, obstaclesToJump, gameArea, intervalMin, intervalMax) {
     this.spawnCount = 0;
     this.obstacles = obstacles;
-    this.gameArea = gameArea;
     this.intervalMin = intervalMin;
     this.intervalMax = intervalMax;
     this.nextReady = true;
@@ -382,9 +405,11 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
         return function() {
             var width = 25;
             var height = 150;
-            var x = obstacleSpawn.gameArea.canvas.width;
-            var y = obstacleSpawn.gameArea.gameLogic.groundY - height;
-            obstacleSpawn.obstacles.unshift(new Obstacle(width, height, "gray", x, y, obstacleSpawn.gameArea, obstacleSpawn.obstacles));
+            var x = gameArea.canvas.width;
+            var y = gameArea.gameLogic.groundY - height;
+            var obstacle = new Obstacle(width, height, "gray", x, y, gameArea, obstacles);
+            obstacles.unshift(obstacle);
+            obstaclesToJump.push(obstacle);
             obstacleSpawn.spawnCount += 1;
             obstacleSpawn.nextReady = true;
         }
@@ -426,9 +451,9 @@ function startGame() {
     myGameArea.start();
     hero = new Hero(35, 90, "red", myGameArea.canvas.width / 2, 20, myGameArea);
     //background = new Background("images/mountains2.png", 50, myGameArea);
-    ObstacleSpawn = new ObstacleSpawn(obstacles, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
+    ObstacleSpawn = new ObstacleSpawn(obstacles, obstaclesToJump, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
     ZombieSpawn = new ZombieSpawn(zombies, myGameArea, hero, zombieIntervalMin, zombieIntervalMax, 10)
-    gameState = "ParkourMode";
+        gameState = "ParkourMode";
     //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
 }
 
@@ -469,6 +494,7 @@ function detectCameraShift(returnState) {
     }
 }
 
+
 function updateGame() {
     //console.log(gameState);
     // Main loop
@@ -484,11 +510,40 @@ function updateGame() {
         zombies[i].render();
     }
 
-    // Detect collision
+    // Detect if get caught by zombie
+    for (i = 0; i < zombies.length; i += 1) {
+        if (hero.crashWith(zombies[i])) {
+            return;
+        }
+    }
+    // Detect obstacle collision
     for (i = 0; i < obstacles.length; i += 1) {
         if (hero.crashWith(obstacles[i])) {
-            myGameArea.stop();
-            return;
+            obstacles[i].collided = true;
+        }
+    }
+    for (i = 0; i < zombies.length; i += 1) {
+        for (j = 0; j < obstacles.length; j += 1) {
+            if (zombies[i].crashWith(obstacles[j])) {
+                zombies[i].speedX = 0;
+            }
+        }
+    }
+
+    if (obstaclesToJump.length > 0) {
+        console.log(obstaclesToJump.length)
+        var obstacle = obstaclesToJump[0];
+        if (obstacle.x < hero.x) {
+            if (!obstacle.collided) {
+                obstacleAvidScore += 1;
+                if (obstacleAvidScore == 3) {
+                    hero.ammo += 1;
+                    obstacleAvidScore = 0;
+                }
+            } else {
+                score -= 100;
+            }
+            obstaclesToJump.shift();
         }
     }
     if (gameState == "ParkourMode") {
@@ -510,8 +565,20 @@ function updateGame() {
                 level += 1;
                 myGameArea.gameLogic.heroSpeedX = heroSpeed(level);
             }, zombieModeDuration);
+            gameState = "ZombieWait";
+        }
+    } else if (gameState == "ZombieWait") {
+        invokeController();
+
+        updateAllPositions();
+
+        detectCameraShift("ZombieWait");
+
+        // Proceed to zombie mode when no obstacles left on screen
+        if (obstacles.length == 0) {
             gameState = "ZombieSpawn";
         }
+
     } else if (gameState == "ZombieSpawn") {
         ZombieSpawn.spawn(10, zombieSpeed(level));
 
@@ -541,8 +608,9 @@ function updateGame() {
         }
     }
 
+    score += 1;
     // Update game stats
-    statString = `Ammo: ${hero.ammo}\nScore: \nLevel: ${level}`
+    statString = `Ammo: ${hero.ammo}\nScore: ${score}\nLevel: ${level}`
     $("#hero_stat").text(statString);
 
 }
