@@ -248,7 +248,7 @@ var gameState;
 var ObstacleSpawn;
 var ZombieSpawn;
 // In miliseconds
-var shiftAnimationDuration = 500;
+var shiftAnimationDuration = 300;
 var shiftAnimationAmount;
 var obstacleIntervalMin = 1200;
 var obstacleIntervalMax = 6000;
@@ -324,7 +324,7 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
     };
 }
 
-// Spawns a horde of zombies
+// Spawn a horde of zombies
 function ZombieSpawn(zombies, gameArea, hero, intervalMin, intervalMax) {
     this.numZombieToSpawn = 0;
     this.spawn = function(number) {
@@ -366,6 +366,33 @@ function startGame() {
     //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
 }
 
+function updateAllPositions() {
+    //background.updatePos();
+    for (i = obstacles.length - 1; i >= 0; i -= 1) {
+        obstacles[i].updatePos();
+    }
+    hero.updatePos();
+    for (i = zombies.length - 1; i >= 0; i -= 1) {
+        zombies[i].updatePos();
+    }
+}
+
+function invokeController() {
+    if (myGameArea.key && myGameArea.key == 38) {
+        heroController.invoke(myGameArea.deltaTime, "Down", hero);
+    } else {
+        heroController.invoke(myGameArea.deltaTime, "Up", hero);
+    }
+}
+
+function detectCameraShift(returnState) {
+    if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
+        shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
+        gameState = "ShiftAnimation";
+        setTimeout(function() { gameState = returnState; }, shiftAnimationDuration);
+    }
+}
+
 function updateGame() {
     //console.log(gameState);
     // Main loop
@@ -391,24 +418,30 @@ function updateGame() {
     if (gameState == "ParkourMode") {
         // Spawn obstacles
         ObstacleSpawn.spawn();
-        //if (myGameArea.keyUp && myGameArea.keyUp == 37) {hero.backward(); }
-        //if (myGameArea.keyUp && myGameArea.keyUp == 39) {hero.forward(); }
-        if (myGameArea.key && myGameArea.key == 38) {
-            heroController.invoke(myGameArea.deltaTime, "Down", hero);
-        } else {
-            heroController.invoke(myGameArea.deltaTime, "Up", hero);
-        }
+
+        invokeController();
+
         // Update game state
-        //background.updatePos();
-        for (i = obstacles.length - 1; i >= 0; i -= 1) {
-            obstacles[i].updatePos();
-        }
-        hero.updatePos();
-        if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
-            shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
-            gameState = "ShiftAnimation";
-            setTimeout(function() { gameState = "ParkourMode"; }, shiftAnimationDuration);
-        }
+        updateAllPositions();
+
+        detectCameraShift("ParkourMode")
+    } else if (gameState == "ZombieSpawn") {
+        ZombieSpawn.spawn(10);
+
+        invokeController();
+
+        updateAllPositions();
+
+        detectCameraShift("ZombieMode");
+
+        gameState = "ZombieMode";
+    } else if (gameState == "ZombieMode") {
+
+        invokeController();
+
+        updateAllPositions();
+
+        detectCameraShift("ZombieMode");
     } else if (gameState == "ShiftAnimation") {
         hero.updatePos();
         shiftAnimationAmountPerFrame = shiftAnimationAmount / (shiftAnimationDuration / myGameArea.deltaTime);
@@ -416,38 +449,8 @@ function updateGame() {
         for (i = obstacles.length - 1; i >= 0; i -= 1) {
             obstacles[i].x += shiftAnimationAmountPerFrame;
         }
-    } else if (gameState == "ZombieSpawn") {
-        ZombieSpawn.spawn(10);
-        if (myGameArea.key && myGameArea.key == 38) {
-            heroController.invoke(myGameArea.deltaTime, "Down", hero);
-        } else {
-            heroController.invoke(myGameArea.deltaTime, "Up", hero);
-        }
-        // update game state
-        hero.updatePos();
-
-        if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
-            shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
-            gameState = "ShiftAnimation";
-            setTimeout(function() { gameState = "ZombieMode"; }, shiftAnimationDuration);
-        }
-
-        gameState = "ZombieMode";
-    } else if (gameState == "ZombieMode") {
-        if (myGameArea.key && myGameArea.key == 38) {
-            heroController.invoke(myGameArea.deltaTime, "Down", hero);
-        } else {
-            heroController.invoke(myGameArea.deltaTime, "Up", hero);
-        }
-        // update game state
-        hero.updatePos();
         for (i = zombies.length - 1; i >= 0; i -= 1) {
-            zombies[i].updatePos();
-        }
-        if ((hero.x < myGameArea.gameLogic.heroFocusLeft || hero.x > myGameArea.gameLogic.heroFocusRight) && hero.y >= hero.botLimit) {
-            shiftAnimationAmount = (myGameArea.canvas.width / 2) - hero.x;
-            gameState = "ShiftAnimation";
-            setTimeout(function() { gameState = "ZombieMode"; }, shiftAnimationDuration);
+            zombies[i].x += shiftAnimationAmountPerFrame;
         }
     }
 }
