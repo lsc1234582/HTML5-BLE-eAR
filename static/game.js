@@ -20,12 +20,12 @@ var myGameArea = {
         };
         this.context = this.canvas.getContext("2d");
         this.deltaTime = 20;
-        this.frames = 1000 / this.deltaTime;
         // frame number counter, could overflow but not a problem when only
         // used to spawn obstacles and zombies
         this.frameNo = 0;
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.interval = setInterval(updateGame, this.deltaTime);
+        //this.interval = setInterval(myGame.updateGame, this.deltaTime);
+        this.animationID = window.requestAnimationFrame(myGame.updateGame);
         window.addEventListener("keydown", function (e) {
             myGameArea.key = e.keyCode;
         });
@@ -42,7 +42,8 @@ var myGameArea = {
         //this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     },
     stop : function() {
-        clearInterval(this.interval);
+        //clearInterval(this.interval);
+        window.cancelAnimationFrame(this.animationID);
     }
 };
 
@@ -66,7 +67,6 @@ function everyInterval(n) {
 //    this.image1.src = imageSource;
 //    this.image2.src = imageSource;
 //    this.updatePos = function() {
-//        var scrollAmount = this.scrollSpeed / this.gameArea.frames;
 //        this.x1 -= scrollAmount;
 //        this.x2 -= scrollAmount;
 //        if (this.x1 <= -this.width) {this.x1 = this.width;}
@@ -98,7 +98,7 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
         var speedX = - gameArea.gameLogic.heroSpeedX;
         // Update position
         //console.log("obstacles length " + obstacles.length);
-        this.x = this.x + speedX / this.gameArea.frames;
+        this.x = this.x + speedX * this.gameArea.deltaTime / 1000;
         // Obstacles only travels in one direction. Suffices to only check against left limit
         // Remove itself from the obstacles array when going out of limits
         if (this.x <= this.leftLimit) {
@@ -135,7 +135,7 @@ function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
         }
         // Speed of zombie relative to player
         var screenVelocity = velocity - this.gameArea.gameLogic.heroSpeedX;
-        this.x = this.x + screenVelocity / this.gameArea.frames;
+        this.x = this.x + screenVelocity * this.gameArea.deltaTime / 1000;
         // Remove itself from the zombies array when going out of limits
         if (this.x <= this.gameArea.gameLogic.zombieRangeLeft ||
                 this.x >= this.gameArea.gameLogic.zombieRangeRight) {
@@ -226,11 +226,11 @@ function Hero(width, height, color, x, y, gameArea) {
             this.accelerateY = this.gravityAccelerate;
         }
         // Update speed
-        this.speedX = this.speedX + this.accelerateX / (this.gameArea.frames * (this.gameArea.gameLogic.heroSpeedX / this.gameArea.gameLogic.heroSpeedXInit));
-        this.speedY = this.speedY + this.accelerateY / this.gameArea.frames;
+        this.speedX = this.speedX + this.accelerateX * this.gameArea.deltaTime / (1000 * (this.gameArea.gameLogic.heroSpeedX / this.gameArea.gameLogic.heroSpeedXInit));
+        this.speedY = this.speedY + this.accelerateY * this.gameArea.deltaTime / 1000;
         // Update position
-        var newX = this.x + this.speedX / this.gameArea.frames;
-        var newY = this.y + this.speedY / this.gameArea.frames;
+        var newX = this.x + this.speedX * this.gameArea.deltaTime/ 1000;
+        var newY = this.y + this.speedY * this.gameArea.deltaTime/ 1000;
         this.x = clip(newX, this.leftLimit, this.rightLimit);
         this.y = Math.min(this.botLimit, newY);
         if (this.y >= this.botLimit) {
@@ -266,7 +266,7 @@ function Hero(width, height, color, x, y, gameArea) {
     this.speedUp = function() {
         if (this.speedUpReady) {
             this.speedUpReady = false;
-            this.speedX = this.speedUpForwardDist * gameArea.frames / this.speedUpDuration;
+            this.speedX = this.speedUpForwardDist * gameArea.deltaTime / this.speedUpDuration;
             console.log(this.speedX);
             gameArea.gameLogic.heroSpeedX += this.speedUpAmount;
             setTimeout(this.speedUpEndCallback(this), this.speedUpDuration);
@@ -447,16 +447,6 @@ function heroSpeedUpCallback(gameArea, speedUpAmount) {
 
 
 
-function startGame() {
-    myGameArea.start();
-    hero = new Hero(35, 90, "red", myGameArea.canvas.width / 2, 20, myGameArea);
-    //background = new Background("images/mountains2.png", 50, myGameArea);
-    ObstacleSpawn = new ObstacleSpawn(obstacles, obstaclesToJump, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
-    ZombieSpawn = new ZombieSpawn(zombies, myGameArea, hero, zombieIntervalMin, zombieIntervalMax, 10)
-        gameState = "ParkourMode";
-    //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
-}
-
 function updateAllPositions() {
     //background.updatePos();
     for (i = obstacles.length - 1; i >= 0; i -= 1) {
@@ -495,124 +485,152 @@ function detectCameraShift(returnState) {
 }
 
 
-function updateGame() {
-    //console.log(gameState);
-    // Main loop
-    myGameArea.clear();
-    myGameArea.frameNo += 1;
-    // Render
-    //background.render();
-    for (i = 0; i < obstacles.length; i += 1) {
-        obstacles[i].render();
-    }
-    hero.render();
-    for (i = 0; i < zombies.length; i += 1) {
-        zombies[i].render();
-    }
+var myGame = {
+    lastTimeStamp: false,
+    accumulator: 0,
+    startGame: function() {
+        myGameArea.start();
+        hero = new Hero(35, 90, "red", myGameArea.canvas.width / 2, 20, myGameArea);
+        //background = new Background("images/mountains2.png", 50, myGameArea);
+        ObstacleSpawn = new ObstacleSpawn(obstacles, obstaclesToJump, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
+        ZombieSpawn = new ZombieSpawn(zombies, myGameArea, hero, zombieIntervalMin, zombieIntervalMax, 10);
+        gameState = "ParkourMode";
+        //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
+    },
 
-    // Detect if get caught by zombie
-    for (i = 0; i < zombies.length; i += 1) {
-        if (hero.crashWith(zombies[i])) {
-            return;
+    updateGame : function(timestamp) {
+        if (!myGame.lastTimeStamp) {
+            myGame.lastTimeStamp = timestamp;
         }
-    }
-    // Detect obstacle collision
-    for (i = 0; i < obstacles.length; i += 1) {
-        if (hero.crashWith(obstacles[i])) {
-            obstacles[i].collided = true;
+        var frameDeltaTime = timestamp - myGame.lastTimeStamp;
+        myGame.lastTimeStamp = timestamp;
+
+        myGame.accumulator += frameDeltaTime;
+
+        while (myGame.accumulator >= myGameArea.deltaTime) {
+            myGame.updateGameLogic();
+            myGame.accumulator -= myGameArea.deltaTime;
         }
-    }
-    for (i = 0; i < zombies.length; i += 1) {
-        for (j = 0; j < obstacles.length; j += 1) {
-            if (zombies[i].crashWith(obstacles[j])) {
-                zombies[i].speedX = 0;
+
+        myGameArea.clear();
+        myGameArea.frameNo += 1;
+        // Render
+        //background.render();
+        for (i = 0; i < obstacles.length; i += 1) {
+            obstacles[i].render();
+        }
+        hero.render();
+        for (i = 0; i < zombies.length; i += 1) {
+            zombies[i].render();
+        }
+        window.requestAnimationFrame(myGame.updateGame);
+    },
+
+    updateGameLogic : function() {
+        if (gameState == "ParkourMode") {
+            // Spawn obstacles
+            ObstacleSpawn.spawn();
+
+            invokeController();
+
+            // Update game state
+            updateAllPositions();
+
+            detectCameraShift("ParkourMode");
+
+            // Proceed to Zombie mode
+            if (ObstacleSpawn.spawnCount >= obstacleSpawnAmountPerLevel) {
+                ObstacleSpawn.spawnCount = 0;
+                setTimeout(function() {
+                    gameState = "ParkourMode";
+                    level += 1;
+                    myGameArea.gameLogic.heroSpeedX = heroSpeed(level);
+                }, zombieModeDuration);
+                gameState = "ZombieWait";
+            }
+        } else if (gameState == "ZombieWait") {
+            invokeController();
+
+            updateAllPositions();
+
+            detectCameraShift("ZombieWait");
+
+            // Proceed to zombie mode when no obstacles left on screen
+            if (obstacles.length == 0) {
+                gameState = "ZombieSpawn";
+            }
+
+        } else if (gameState == "ZombieSpawn") {
+            ZombieSpawn.spawn(10, zombieSpeed(level));
+
+            invokeController();
+
+            updateAllPositions();
+
+            detectCameraShift("ZombieMode");
+
+            gameState = "ZombieMode";
+        } else if (gameState == "ZombieMode") {
+
+            invokeController();
+
+            updateAllPositions();
+
+            detectCameraShift("ZombieMode");
+        } else if (gameState == "ShiftAnimation") {
+            hero.updatePos();
+            shiftAnimationAmountPerFrame = shiftAnimationAmount / (shiftAnimationDuration / myGameArea.deltaTime);
+            hero.x += shiftAnimationAmountPerFrame;
+            for (i = obstacles.length - 1; i >= 0; i -= 1) {
+                obstacles[i].x += shiftAnimationAmountPerFrame;
+            }
+            for (i = zombies.length - 1; i >= 0; i -= 1) {
+                zombies[i].x += shiftAnimationAmountPerFrame;
             }
         }
-    }
 
-    if (obstaclesToJump.length > 0) {
-        console.log(obstaclesToJump.length)
-        var obstacle = obstaclesToJump[0];
-        if (obstacle.x < hero.x) {
-            if (!obstacle.collided) {
-                obstacleAvidScore += 1;
-                if (obstacleAvidScore == 3) {
-                    hero.ammo += 1;
-                    obstacleAvidScore = 0;
+        // Detect if get caught by zombie
+        for (i = 0; i < zombies.length; i += 1) {
+            if (hero.crashWith(zombies[i])) {
+                return;
+            }
+        }
+        // Detect obstacle collision
+        for (i = 0; i < obstacles.length; i += 1) {
+            if (hero.crashWith(obstacles[i])) {
+                obstacles[i].collided = true;
+            }
+        }
+        for (i = 0; i < zombies.length; i += 1) {
+            for (j = 0; j < obstacles.length; j += 1) {
+                if (zombies[i].crashWith(obstacles[j])) {
+                    zombies[i].speedX = 0;
                 }
-            } else {
-                score -= 100;
             }
-            obstaclesToJump.shift();
         }
+
+        if (obstaclesToJump.length > 0) {
+            console.log(obstaclesToJump.length)
+                var obstacle = obstaclesToJump[0];
+            if (obstacle.x < hero.x) {
+                if (!obstacle.collided) {
+                    obstacleAvidScore += 1;
+                    if (obstacleAvidScore == 3) {
+                        hero.ammo += 1;
+                        obstacleAvidScore = 0;
+                    }
+                } else {
+                    score -= 100;
+                }
+                obstaclesToJump.shift();
+            }
+        }
+
+        score += 1;
+        // Update game stats
+        statString = `Ammo: ${hero.ammo}\nScore: ${score}\nLevel: ${level}`
+            $("#hero_stat").text(statString);
     }
-    if (gameState == "ParkourMode") {
-        // Spawn obstacles
-        ObstacleSpawn.spawn();
-
-        invokeController();
-
-        // Update game state
-        updateAllPositions();
-
-        detectCameraShift("ParkourMode");
-
-        // Proceed to Zombie mode
-        if (ObstacleSpawn.spawnCount >= obstacleSpawnAmountPerLevel) {
-            ObstacleSpawn.spawnCount = 0;
-            setTimeout(function() {
-                gameState = "ParkourMode";
-                level += 1;
-                myGameArea.gameLogic.heroSpeedX = heroSpeed(level);
-            }, zombieModeDuration);
-            gameState = "ZombieWait";
-        }
-    } else if (gameState == "ZombieWait") {
-        invokeController();
-
-        updateAllPositions();
-
-        detectCameraShift("ZombieWait");
-
-        // Proceed to zombie mode when no obstacles left on screen
-        if (obstacles.length == 0) {
-            gameState = "ZombieSpawn";
-        }
-
-    } else if (gameState == "ZombieSpawn") {
-        ZombieSpawn.spawn(10, zombieSpeed(level));
-
-        invokeController();
-
-        updateAllPositions();
-
-        detectCameraShift("ZombieMode");
-
-        gameState = "ZombieMode";
-    } else if (gameState == "ZombieMode") {
-
-        invokeController();
-
-        updateAllPositions();
-
-        detectCameraShift("ZombieMode");
-    } else if (gameState == "ShiftAnimation") {
-        hero.updatePos();
-        shiftAnimationAmountPerFrame = shiftAnimationAmount / (shiftAnimationDuration / myGameArea.deltaTime);
-        hero.x += shiftAnimationAmountPerFrame;
-        for (i = obstacles.length - 1; i >= 0; i -= 1) {
-            obstacles[i].x += shiftAnimationAmountPerFrame;
-        }
-        for (i = zombies.length - 1; i >= 0; i -= 1) {
-            zombies[i].x += shiftAnimationAmountPerFrame;
-        }
-    }
-
-    score += 1;
-    // Update game stats
-    statString = `Ammo: ${hero.ammo}\nScore: ${score}\nLevel: ${level}`
-    $("#hero_stat").text(statString);
-
 }
 
 socket = io.connect('http://' + document.domain + ':' + location.port);
@@ -667,5 +685,5 @@ function json_button() {
     socket.send('{"message": "test"}');
 }
 $(document).ready(function(){
-    startGame();
+    myGame.startGame();
 });
