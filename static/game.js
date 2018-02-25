@@ -117,8 +117,13 @@ function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
 
     this.render = function() {
         var ctx = gameArea.context;
+        ctx.beginPath();
+        ctx.rect(this.x, this.y, this.width, this.height)
         ctx.fillStyle = color;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "black";
+        ctx.stroke();
     }
     this.updatePos = function() {
         // Simple Zombie AI
@@ -155,6 +160,18 @@ function Hero(width, height, color, x, y, gameArea) {
     this.leftLimit = 0;
     this.botLimit = this.gameArea.gameLogic.groundY - this.height;
 
+    this.speedUpDuration = 5000; // Duration of the speed up special move in milliseconds.
+    this.speedUpForwardDist = 100; // Pixel distance
+    this.speedUpCooldown = 3000;
+    this.speedUpAmount = 100;
+    this.speedUpReady = true;
+
+    this.ammo = 3;
+    this.deathCountMin = 1;
+    this.deathCountMax = 3;
+    this.attackCooldown = 600;
+    this.attackReady = true;
+
     this.x = x;
     this.y = y;
     this.speedX = 0;
@@ -174,7 +191,6 @@ function Hero(width, height, color, x, y, gameArea) {
         if (this.jumpContactTimerX > 0) {
             this.jumpContactTimerX -= this.gameArea.deltaTime;
             this.accelerateX = this.jumpAccelerateX;
-            //this.speedX = this.jumpSpeedX;
         } else {
             // if in air, apply horizontal air drag
             if (this.y < this.botLimit) {
@@ -202,17 +218,57 @@ function Hero(width, height, color, x, y, gameArea) {
             this.speedY = 0;
         }
     }
-    this.setJumpContactTimerX = function(heroEntity) {
+    this.setJumpContactTimerXCallback = function(heroEntity) {
         return function() {heroEntity.jumpContactTimerX = heroEntity.jumpContactTimeX;};
     }
     this.jump = function() {
         if (this.y >= this.botLimit) {
             this.jumpContactTimerY = this.jumpContactTimeY;
             // Delaying jumping forward
-            setTimeout(this.setJumpContactTimerX(this), 70);
+            setTimeout(this.setJumpContactTimerXCallback(this), 70);
             //this.jumpContactTimerX = this.jumpContactTimeX;
         }
     }
+
+    this.speedUpCoolDownEndCallback = function(heroEntity) {
+        return function() {
+            heroEntity.speedUpReady = true;
+        }
+    }
+
+    this.speedUpEndCallback = function(heroEntity) {
+        return function() {
+            heroEntity.speedX = 0;
+            gameArea.gameLogic.heroSpeedX -= heroEntity.speedUpAmount;
+            setTimeout(heroEntity.speedUpCoolDownEndCallback(heroEntity), heroEntity.speedUpCooldown);
+        }
+    }
+
+    this.speedUp = function() {
+        if (this.speedUpReady) {
+            this.speedUpReady = false;
+            this.speedX = this.speedUpForwardDist * gameArea.frames / this.speedUpDuration;
+            console.log(this.speedX);
+            gameArea.gameLogic.heroSpeedX += this.speedUpAmount;
+            setTimeout(this.speedUpEndCallback(this), this.speedUpDuration);
+        }
+    }
+
+    this.setAttackReadyCallback = function(heroEntity) {
+        return function() {heroEntity.attackReady = true;};
+    }
+    this.attack = function(zombies) {
+        if (this.ammo > 0 && this.attackReady) {
+            this.attackReady = false;
+            var deathCount = this.deathCountMin + Math.floor(Math.random() * (this.deathCountMax - this.deathCountMin));
+            for (var i = 0; i < deathCount; i += 1) {
+                zombies.pop();
+            }
+            this.ammo -= 1;
+            setTimeout(this.setAttackReadyCallback(this), this.attackCooldown);
+        }
+    }
+
     this.crashWith = function(otherObj) {
         var myleft = this.x;
         var myright = this.x + (this.width);
@@ -230,12 +286,6 @@ function Hero(width, height, color, x, y, gameArea) {
             crash = false;
         }
         return crash;
-    }
-    this.forward = function() {
-        this.speedX = 20;
-    }
-    this.backward = function() {
-        this.speedX = -20;
     }
 }
 
@@ -269,7 +319,6 @@ var heroController = {
     state : "buildUp",
     invoke: function(deltaTime, keyEvent, entity) {
         if (this.state == "buildUp"){
-            //console.log("buildUpTime" + this.buildUpTimer);
             if (keyEvent == "Down") {
                 this.buildUpTimer = this.buildUpTimer + deltaTime;
             } else if (keyEvent == "Up") {
@@ -277,13 +326,11 @@ var heroController = {
                 this.keyReleased = true;
             }
             if (this.buildUpTimer >= this.reactionTime && this.keyReleased) {
-                //console.log("execute");
                 entity.jump();
                 this.buildUpTimer = 0;
                 this.state = "coolDown";
             }
         } else if (this.state == "coolDown") {
-            //console.log("coolDown");
             if (keyEvent == "Up") {
                 this.keyReleased = true;
             }
@@ -378,8 +425,18 @@ function updateAllPositions() {
 }
 
 function invokeController() {
-    if (myGameArea.key && myGameArea.key == 38) {
-        heroController.invoke(myGameArea.deltaTime, "Down", hero);
+    if (myGameArea.key) {
+        if (myGameArea.key == 38) {
+            heroController.invoke(myGameArea.deltaTime, "Down", hero);
+        } else if (myGameArea.key == 82) {
+            // Speedup
+            heroController.invoke(myGameArea.deltaTime, "Up", hero);
+            hero.speedUp();
+        } else if (myGameArea.key == 32) {
+            // Attack
+            heroController.invoke(myGameArea.deltaTime, "Up", hero);
+            hero.attack(zombies);
+        }
     } else {
         heroController.invoke(myGameArea.deltaTime, "Up", hero);
     }
@@ -453,6 +510,11 @@ function updateGame() {
             zombies[i].x += shiftAnimationAmountPerFrame;
         }
     }
+
+    // Update game stats
+    statString = `Ammo: ${hero.ammo}\nScore: \nLevel:`
+    $("#hero_stat").text(statString);
+
 }
 
 socket = io.connect('http://' + document.domain + ':' + location.port);
