@@ -14,8 +14,8 @@ var myGameArea = {
             heroFocusLeft: 300,
             heroFocusRight: 700,
             // the area that zombies are allowed to be in
-            zombieRangeLeft: -100,
-            zombieRangeRight: 1100,
+            zombieRangeLeft: -200,
+            zombieRangeRight: 1200,
             airDragAcc : 80
         };
         this.context = this.canvas.getContext("2d");
@@ -87,7 +87,6 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
     this.y = y;
     this.leftLimit = - this.width;
     this.rightLimit = gameArea.canvas.width;
-    this.speedX = - gameArea.gameLogic.heroSpeedX;
     this.render = function() {
         var ctx = this.gameArea.context;
         ctx.fillStyle = color;
@@ -95,9 +94,10 @@ function Obstacle(width, height, color, x, y, gameArea, obstacles) {
     }
     // Update position
     this.updatePos = function() {
+        var speedX = - gameArea.gameLogic.heroSpeedX;
         // Update position
         //console.log("obstacles length " + obstacles.length);
-        this.x = this.x + this.speedX / this.gameArea.frames;
+        this.x = this.x + speedX / this.gameArea.frames;
         // Obstacles only travels in one direction. Suffices to only check against left limit
         // Remove itself from the obstacles array when going out of limits
         if (this.x <= this.leftLimit) {
@@ -138,7 +138,7 @@ function Zombie(width, height, color, x, y, speedX, gameArea, zombies, hero) {
         // Remove itself from the zombies array when going out of limits
         if (this.x <= this.gameArea.gameLogic.zombieRangeLeft ||
                 this.x >= this.gameArea.gameLogic.zombieRangeRight) {
-            zombies.splice(obstacles.indexOf(this), 1);
+            zombies.splice(zombies.indexOf(this), 1);
         }
     }
 
@@ -298,14 +298,24 @@ var gameState;
 var ObstacleSpawn;
 var ZombieSpawn;
 // In miliseconds
-var shiftAnimationDuration = 300;
-var shiftAnimationAmount;
 var obstacleIntervalMin = 1200;
 var obstacleIntervalMax = 6000;
 var zombieIntervalMin = 300;
 var zombieIntervalMax = 1000;
+var obstacleSpawnAmountPerLevel = 15;
+
+var level = 1;
+var maxLevel = 10;
+var zombieModeDuration = 20000;
+
+var heroBaseSpeed = 150;
 var heroSpeedUpAmount = 50;
-var heroSpeedUpInterval = 10000;
+
+var zombieBaseSpeed = 210;
+var zombieSpeedUpAmount = 60;
+
+var shiftAnimationDuration = 300;
+var shiftAnimationAmount;
 
 var heroController = {
     reactionTime: 120,   // Time, in miliseconds, needed to build up an action.
@@ -345,7 +355,16 @@ var heroController = {
     }
 };
 
+function heroSpeed(level) {
+    return heroBaseSpeed + Math.min(level - 1, 9) * heroSpeedUpAmount;
+}
+
+function zombieSpeed(level) {
+    return zombieBaseSpeed + Math.min(level - 1, 9) * zombieSpeedUpAmount;
+}
+
 function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
+    this.spawnCount = 0;
     this.obstacles = obstacles;
     this.gameArea = gameArea;
     this.intervalMin = intervalMin;
@@ -366,6 +385,7 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
             var x = obstacleSpawn.gameArea.canvas.width;
             var y = obstacleSpawn.gameArea.gameLogic.groundY - height;
             obstacleSpawn.obstacles.unshift(new Obstacle(width, height, "gray", x, y, obstacleSpawn.gameArea, obstacleSpawn.obstacles));
+            obstacleSpawn.spawnCount += 1;
             obstacleSpawn.nextReady = true;
         }
     };
@@ -373,9 +393,9 @@ function ObstacleSpawn(obstacles, gameArea, intervalMin, intervalMax) {
 
 // Spawn a horde of zombies
 function ZombieSpawn(zombies, gameArea, hero, intervalMin, intervalMax) {
-    this.numZombieToSpawn = 0;
-    this.spawn = function(number) {
+    this.spawn = function(number, speedX) {
         this.numZombieToSpawn = number;
+        this.speedX = speedX;
         this.spawnZombieCallback(this)();
     }
     this.spawnZombieCallback = function(zombieSpawn) {
@@ -385,8 +405,7 @@ function ZombieSpawn(zombies, gameArea, hero, intervalMin, intervalMax) {
                 var height = 90;
                 var x = -width;
                 var y = gameArea.gameLogic.groundY - height;
-                var speedX = gameArea.gameLogic.heroSpeedX + 60;
-                zombies.unshift(new Zombie(width, height, "green", x, y, speedX, gameArea, zombies, hero));
+                zombies.unshift(new Zombie(width, height, "green", x, y, zombieSpawn.speedX, gameArea, zombies, hero));
                 zombieSpawn.numZombieToSpawn -= 1;
                 var interval = intervalMin + Math.floor(Math.random() * (intervalMax - intervalMin));
                 setTimeout(zombieSpawn.spawnZombieCallback(zombieSpawn), interval);
@@ -409,7 +428,7 @@ function startGame() {
     //background = new Background("images/mountains2.png", 50, myGameArea);
     ObstacleSpawn = new ObstacleSpawn(obstacles, myGameArea, obstacleIntervalMin, obstacleIntervalMax);
     ZombieSpawn = new ZombieSpawn(zombies, myGameArea, hero, zombieIntervalMin, zombieIntervalMax, 10)
-    gameState = "ZombieSpawn";
+    gameState = "ParkourMode";
     //setInterval(heroSpeedUpCallback(myGameArea, heroSpeedUpAmount), heroSpeedUpInterval);
 }
 
@@ -481,9 +500,20 @@ function updateGame() {
         // Update game state
         updateAllPositions();
 
-        detectCameraShift("ParkourMode")
+        detectCameraShift("ParkourMode");
+
+        // Proceed to Zombie mode
+        if (ObstacleSpawn.spawnCount >= obstacleSpawnAmountPerLevel) {
+            ObstacleSpawn.spawnCount = 0;
+            setTimeout(function() {
+                gameState = "ParkourMode";
+                level += 1;
+                myGameArea.gameLogic.heroSpeedX = heroSpeed(level);
+            }, zombieModeDuration);
+            gameState = "ZombieSpawn";
+        }
     } else if (gameState == "ZombieSpawn") {
-        ZombieSpawn.spawn(10);
+        ZombieSpawn.spawn(10, zombieSpeed(level));
 
         invokeController();
 
@@ -512,7 +542,7 @@ function updateGame() {
     }
 
     // Update game stats
-    statString = `Ammo: ${hero.ammo}\nScore: \nLevel:`
+    statString = `Ammo: ${hero.ammo}\nScore: \nLevel: ${level}`
     $("#hero_stat").text(statString);
 
 }
