@@ -1,4 +1,5 @@
 var myGameArea = {
+    //uiCanvas: document.createElement("canvas"),
     canvas : document.createElement("canvas"),
     fgCanvas: document.createElement("canvas"),
     bgCanvas: document.createElement("canvas"),
@@ -10,6 +11,8 @@ var myGameArea = {
         this.fgCanvas.height = 600;
         this.bgCanvas.width = 1000;
         this.bgCanvas.height = 600;
+        //this.uiCanvas.width =  500;
+        //this.uiCanvas.height = 200;
         this.backgroundImage.src = "static/Background2.png";
         this.gameLogic = {
             groundY : 500,
@@ -27,12 +30,18 @@ var myGameArea = {
         this.context = this.canvas.getContext("2d");
         this.fgContext = this.fgCanvas.getContext("2d");
         this.bgContext = this.bgCanvas.getContext("2d");
+        //this.uiContext = this.uiCanvas.getContext("2d");
         this.deltaTime = 20;
         // frame number counter, could overflow but not a problem when only
         // used to spawn obstacles and zombies
         document.body.insertBefore(this.bgCanvas, document.body.childNodes[0]);
         document.body.insertBefore(this.fgCanvas, document.body.childNodes[1]);
         document.body.insertBefore(this.canvas, document.body.childNodes[2]);
+        //document.body.insertBefore(this.uiCanvas, document.body.childNodes[3]);
+        //this.uiCanvas.style.position = "absolute";
+        //this.uiCanvas.style.left = "500px";
+        //this.uiCanvas.style.top = "100px";
+        //this.uiCanvas.style.zindex = "4";
         this.canvas.style.position = "absolute";
         this.canvas.style.left = "0px";
         this.canvas.style.top = "0px";
@@ -54,6 +63,10 @@ var myGameArea = {
         });
         //this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         this.bgContext.drawImage(this.backgroundImage, 0, 0, this.bgCanvas.width, this.bgCanvas.height);
+        this.context.font = "20px Georgia";
+        this.context.fillStyle = "white";
+        //this.uiContext.font = "20px Georgia";
+        //this.uiContext.color = "white";
         this.animationID = window.requestAnimationFrame(myGame.updateGame);
     },
     clear : function(){
@@ -72,10 +85,6 @@ function clip(x, min, max){
     return Math.min(max, Math.max(min, x))
 }
 
-function everyInterval(n) {
-    return ((myGameArea.frameNo % n) == 0);
-}
-
 function Foreground(image, gameArea) {
     this.width = gameArea.canvas.width;
     this.x1 = 0;
@@ -83,9 +92,6 @@ function Foreground(image, gameArea) {
     this.y = gameArea.gameLogic.groundY;
     //this.y = 500;
     this.updatePos = function() {
-        console.log(this.x1);
-        console.log(this.x2);
-        console.log(this.y);
         var speedX = - gameArea.gameLogic.heroSpeedX;
         this.x1 = this.x1 + speedX * gameArea.deltaTime / 1000;
         this.x2 = this.x2 + speedX * gameArea.deltaTime / 1000;
@@ -121,7 +127,6 @@ function Obstacle(width, height, spriteSheet, x, y, gameArea, obstacles) {
     this.updatePos = function() {
         var speedX = - gameArea.gameLogic.heroSpeedX;
         // Update position
-        //console.log("obstacles length " + obstacles.length);
         this.x = this.x + speedX * this.gameArea.deltaTime / 1000;
         // Obstacles only travels in one direction. Suffices to only check against left limit
         // Remove itself from the obstacles array when going out of limits
@@ -292,8 +297,6 @@ function Hero(width, height, runSpriteSheet, jumpSpriteSheet, attackSpriteSheet,
     }
     // Update position
     this.updatePos = function() {
-        //console.log("speedY " + this.speedY);
-        //console.log("accX " + this.accelerateX);
         // Determine if jumping or not
         if (this.jumpContactTimerX > 0) {
             this.jumpContactTimerX -= gameArea.deltaTime;
@@ -360,7 +363,6 @@ function Hero(width, height, runSpriteSheet, jumpSpriteSheet, attackSpriteSheet,
         if (this.speedUpReady) {
             this.speedUpReady = false;
             this.speedX = this.speedUpForwardDist * gameArea.deltaTime / this.speedUpDuration;
-            console.log(this.speedX);
             gameArea.gameLogic.heroSpeedX += this.speedUpAmount;
             setTimeout(this.speedUpEndCallback(this), this.speedUpDuration);
         }
@@ -640,6 +642,7 @@ var myGame = {
         for (i = 0; i < zombies.length; i += 1) {
             zombies[i].clear();
         }
+        myGameArea.context.clearRect(500, 50, 500, 150);
         if (!myGame.lastTimeStamp) {
             myGame.lastTimeStamp = timestamp;
         }
@@ -654,12 +657,15 @@ var myGame = {
         while (myGame.accumulator >= myGameArea.deltaTime) {
             var terminate = myGame.updateGameLogic(frameDeltaTime);
             if (terminate) {
+                var gameOverString = `You died! \nFinal Score: ${score}`;
+                myGameArea.context.font = "40px Georgia";
+                myGameArea.context.fillStyle = "red";
+                myGameArea.context.fillText(gameOverString, 300, 300);
                 return;
             }
             myGame.accumulator -= myGameArea.deltaTime;
         }
 
-        myGameArea.frameNo += 1;
         // Render
         foreground.render();
         for (i = 0; i < obstacles.length; i += 1) {
@@ -669,6 +675,8 @@ var myGame = {
         for (i = 0; i < zombies.length; i += 1) {
             zombies[i].render(frameDeltaTime);
         }
+        var statString = `Ammo: ${hero.ammo}\nScore: ${score}\nLevel: ${level}`;
+        myGameArea.context.fillText(statString, 600, 100);
         window.requestAnimationFrame(myGame.updateGame);
     },
 
@@ -758,8 +766,7 @@ var myGame = {
         }
 
         if (obstaclesToJump.length > 0) {
-            console.log(obstaclesToJump.length)
-                var obstacle = obstaclesToJump[0];
+            var obstacle = obstaclesToJump[0];
             if (obstacle.x < hero.x) {
                 if (!obstacle.collided) {
                     obstacleAvidScore += 1;
@@ -774,10 +781,8 @@ var myGame = {
             }
         }
 
-        score += 1;
         // Update game stats
-        statString = `Ammo: ${hero.ammo}\nScore: ${score}\nLevel: ${level}`;
-        $("#hero_stat").text(statString);
+        score += 1;
     },
     displayMenu: function() {
         this.menuCanvas = document.createElement("canvas");
